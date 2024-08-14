@@ -1,9 +1,7 @@
 import logging
 import os
-import string
 from urllib.parse import urljoin
-import random
-import string
+
 import streamlit as st
 from terrasnek.api import TFC
 from no_code import NoCodeDeploy
@@ -51,8 +49,8 @@ def get_link_list():
             # example link
             # https://app.terraform.io/app/hc-ric-demo/registry/modules/private/hc-ric-demo/k8s/aws/1.0.3/new-workspace
             link = f"https://{hostname}/app/{organization}/registry/modules/{registry_origin}/{attr['namespace']}/{attr['name']}/{attr['provider']}/{latest_version}/new-workspace"
-            
-            no_code_list.append({ 'name': attr['name'], 'link': link, 'data': no_code_module })
+            registry_link = f"https://{hostname}/api/registry/v1/modules/{organization}/{attr['name']}/{attr['provider']}/{latest_version}"
+            no_code_list.append({'name': attr['name'], 'link': link, 'data': no_code_module , 'registry_link': registry_link})
             
     return no_code_list
 
@@ -77,7 +75,7 @@ def no_code_deploy():
     for i, module in enumerate(st.session_state['module_list']):
         col = cols[i % NUM_COLUMNS]
         if col.button(label=module['name'],use_container_width=True,type='primary'):
-            st.session_state['deploy_module'] = (module['name'], module['data'])
+            st.session_state['deploy_module'] = (module['name'], module['data'], module['registry_link'])
 
         # b_deploy[module['name']] = col.button(label=module['name'],use_container_width=True,type='primary')
         # col.link_button(label=module['name'], url=module['link'],use_container_width=True,type='primary')
@@ -101,26 +99,50 @@ def deploy_nocode_module(project):
 
     deploy_form = st.form(key="deploy_form", border=True)
     api: TFC  = st.session_state['api']
-    (deploy_module_name, deploy_module_data) = st.session_state['deploy_module']
+    (deploy_module_name, deploy_module_data, deploy_module_registry_link) = st.session_state['deploy_module']
     no_code_id = deploy_module_data['data']['id']
 
     deploy_form.markdown(f"## Deploy {deploy_module_name}")
-    random_chars = ''.join(random.choice(string.ascii_letters) for _ in range(3))
+    # random_chars = ''.join(random.choice(string.ascii_letters) for _ in range(3))
     
-    ws_name = deploy_form.text_input("Workspace name", value=f"{deploy_module_name}-{random_chars}")
-    # nocode_options = show_with_options(api, no_code_id)
+    ws_name = deploy_form.text_input("Workspace name", key="ws_name",value=f"{deploy_module_name}-")
+    nocode_options = show_with_options(api, no_code_id)
     
-    vars = {}
-    if 'included' in deploy_module_data:
-        for variable in deploy_module_data['included']:
-            var_name = variable['attributes']['variable-name']
-            # deploy_form.json(variable['attributes'])
-            vars[var_name] = deploy_form.text_input(var_name)
-                
-        # deploy_form.json(deploy_module_data, expanded=False)
+    # deploy_form.json(deploy_module_data, expanded=False)
+    # deploy_form.json(nocode_options, expanded=False)
+    registry_information = api._get(deploy_module_registry_link)
+    required_vars = extract_required_variables (registry_information)
+    # deploy_form.json(registry_information,expanded=False)
+    # deploy_form.json(required_vars, expanded=False)
+    input_vars = []
+    
+    if len(required_vars) > 0:
+        for variable in required_vars:
+            var_name = variable['name']
+            # deploy_form.json(variable)
+            input_vars.append({
+                "key": var_name,
+                "value": deploy_form.text_input(var_name),
+                "category": "terraform"
+            })
     else:
-        st.warning("No variables found")
-        deploy_form.json(deploy_module_data, expanded=False)
+        st.warning("No mandatory variables found")
+    # if 'included' in nocode_options:
+    #     for variable in nocode_options['included']:
+    #         var_name = variable['attributes']['variable-name']
+    #         # deploy_form.json(variable['attributes'])
+    #         # vars[var_name] = 
+            
+    #         input_vars.append({
+    #             "key": var_name,
+    #             "value": deploy_form.text_input(var_name),
+    #             "category": "terraform"
+    #         })
+                
+    # else:
+    #     st.warning("No variables found")
+    #     deploy_form.json(deploy_module_data, expanded=False)
+    #     deploy_form.json(nocode_options, expanded=False)
 
     b_deploy = deploy_form.form_submit_button("Deploy", type="primary")
     # col1, col2 = st.columns(2)
@@ -137,8 +159,8 @@ def deploy_nocode_module(project):
             payload = NoCodeDeploy(workspace_name=ws_name,
                                             workspace_description=f"{deploy_module_name} deployed from no-code portal",
                                             project_id=project['id'],
-                                            vars=[]).generate()
-            st.json(payload)
+                                            vars=input_vars).generate()
+            # st.json(payload)
             error = False
             deploy_result : Any
             try:    
@@ -148,13 +170,20 @@ def deploy_nocode_module(project):
                 error = True
                         
             if not error:
-                st.success(f"Workspace {ws_name} deployed [here]({deploy_result['data']['links']['self-html']})")
-                st.markdown(f"Workspace {ws_name} deployed [here]({deploy_result['data']['links']['self-html']})")
-                st.write(deploy_result)
+                st.success(f"Workspace {ws_name} deployed [here]({api.get_url()}{deploy_result['data']['links']['self-html']})")
+                st.markdown(f"Workspace {ws_name} deployed [here]({api.get_url()}{deploy_result['data']['links']['self-html']})")
+                # st.write(deploy_result)
     # if b_clear:
     #     st.session_state['deploy_module'] = None
     #     del st.session_state['deploy_module']
                     
+def extract_required_variables (registry_information):
+    required_vars = []
+    for variable in registry_information['root']['inputs']:
+        if variable['required']:
+            required_vars.append(variable)
+            print (variable)
+    return required_vars
 
 def display_workspaces(project_id):
     workspaces = get_workspaces_by_project_id(project_id)
