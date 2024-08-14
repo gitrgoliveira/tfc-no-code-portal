@@ -9,3 +9,4 @@ build/
 
 # Streamlit
 .streamlit/
+.vcode
