@@ -44,7 +44,7 @@ class NoCodeDeploy:
                     "key": var['key'],
                     "value": var['value'],
                     "category": var['category'],
-                    "hcl": True,
+                    "hcl": False,
                     "sensitive": False
                 }
             })
