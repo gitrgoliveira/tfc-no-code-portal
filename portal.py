@@ -49,7 +49,8 @@ def get_link_list():
             # example link
             # https://app.terraform.io/app/hc-ric-demo/registry/modules/private/hc-ric-demo/k8s/aws/1.0.3/new-workspace
             link = f"https://{hostname}/app/{organization}/registry/modules/{registry_origin}/{attr['namespace']}/{attr['name']}/{attr['provider']}/{latest_version}/new-workspace"
-            registry_link = f"https://{hostname}/api/registry/v1/modules/{organization}/{attr['name']}/{attr['provider']}/{latest_version}"
+            # registry_link = f"https://{hostname}/api/registry/v1/modules/{organization}/{attr['name']}/{attr['provider']}/{latest_version}"
+            registry_link = f"https://{hostname}/api/registry/{registry_origin}/v2/modules/{attr['namespace']}/{attr['name']}/{attr['provider']}/metadata/{latest_version}?organization_name={organization}"
             no_code_list.append({'name': attr['name'], 'link': link, 'data': no_code_module , 'registry_link': registry_link})
             
     return no_code_list
@@ -110,6 +111,7 @@ def deploy_nocode_module(project):
     
     # deploy_form.json(deploy_module_data, expanded=False)
     # deploy_form.json(nocode_options, expanded=False)
+    
     registry_information = api._get(deploy_module_registry_link)
     required_vars = extract_required_variables (registry_information)
     # deploy_form.json(registry_information,expanded=False)
@@ -119,12 +121,21 @@ def deploy_nocode_module(project):
     if len(required_vars) > 0:
         for variable in required_vars:
             var_name = variable['name']
-            # deploy_form.json(variable)
-            input_vars.append({
-                "key": var_name,
-                "value": deploy_form.text_input(var_name),
-                "category": "terraform"
-            })
+            if variable['sensitive']:
+                input_vars.append({
+                    "key": var_name,
+                    "value": deploy_form.text_input(var_name, type='password'),
+                    "category": "terraform",
+                    "sensitive": True
+                })
+            else:
+                input_vars.append({
+                    "key": var_name,
+                    "value": deploy_form.text_input(var_name, type='default'),
+                    "category": "terraform",
+                    "sensitive": False
+                })
+                
     else:
         st.warning("No mandatory variables found")
     # if 'included' in nocode_options:
@@ -179,10 +190,13 @@ def deploy_nocode_module(project):
                     
 def extract_required_variables (registry_information):
     required_vars = []
-    for variable in registry_information['root']['inputs']:
+    for variable in registry_information['data']['attributes']['input-variables']:
         if variable['required']:
             required_vars.append(variable)
-            print (variable)
+    # for variable in registry_information['root']['inputs']:
+    #     if variable['required']:
+    #         required_vars.append(variable)
+    #         print (variable)
     return required_vars
 
 def display_workspaces(project_id):
