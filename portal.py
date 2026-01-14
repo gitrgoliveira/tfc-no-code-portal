@@ -251,7 +251,7 @@ def settings():
     TFC_URL = os.getenv("TFC/E_URL", "https://app.terraform.io")
     with st.sidebar:    
         url = st.text_input("TFC URL", value=TFC_URL)
-        token = st.text_input("TFC Token", value=TFC_TOKEN, type="password")
+        token = st.text_input("TFC Token - https://app.terraform.io/app/settings/tokens", value=TFC_TOKEN, type="password")
         try:
             api = TFC(api_token=token, url=url)
             # api = TFC(api_token=token, url=url,log_level=logging.DEBUG)
