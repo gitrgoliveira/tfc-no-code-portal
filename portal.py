@@ -1,17 +1,105 @@
 import logging
 import os
-from urllib.parse import urljoin
+import json
+import platform
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 import streamlit as st
 from terrasnek.api import TFC
 from no_code import NoCodeDeploy
-from typing import Any
+from typing import Any, Tuple, Optional
 # from typing import list
 ## get terraform URL and credentials from environment
 
 TFC_TOKEN = os.getenv("TFC_TOKEN", None)
 
 NUM_COLUMNS = 4
+
+
+def get_credentials_file_path() -> Path:
+    """Get the Terraform credentials file path based on OS.
+    
+    Returns:
+        Path to credentials.tfrc.json file
+    """
+    home = Path.home()
+    if platform.system() == "Windows":
+        appdata = os.getenv("APPDATA")
+        if appdata:
+            return Path(appdata) / "terraform.d" / "credentials.tfrc.json"
+    return home / ".terraform.d" / "credentials.tfrc.json"
+
+
+def extract_hostname(url: str) -> str:
+    """Extract hostname from URL for credential lookup.
+    
+    Args:
+        url: Full URL (e.g., 'https://app.terraform.io')
+        
+    Returns:
+        Hostname without protocol (e.g., 'app.terraform.io')
+    """
+    parsed = urlparse(url)
+    hostname = parsed.netloc if parsed.netloc else parsed.path.split('/')[0]
+    # Remove port if present
+    if ':' in hostname:
+        hostname = hostname.split(':')[0]
+    return hostname.lower().strip('/')
+
+
+def get_terraform_token(url: str = "https://app.terraform.io") -> Tuple[Optional[str], str]:
+    """Get Terraform token from multiple sources with priority.
+    
+    Priority order:
+    1. Environment variable TF_TOKEN_{hostname}
+    2. ~/.terraform.d/credentials.tfrc.json file
+    3. TFC_TOKEN environment variable (legacy)
+    
+    Args:
+        url: Terraform Cloud/Enterprise URL
+        
+    Returns:
+        Tuple of (token, source_description)
+    """
+    hostname = extract_hostname(url)
+    
+    # Try environment variable TF_TOKEN_{hostname} (highest priority)
+    env_var_name = f"TF_TOKEN_{hostname.replace('.', '_').replace('-', '__')}"
+    token = os.getenv(env_var_name)
+    if token and token.strip():
+        logging.debug(f"Token loaded from environment variable: {env_var_name}")
+        return token.strip(), f"Environment Variable ({env_var_name})"
+    
+    # Try credentials file
+    creds_file = get_credentials_file_path()
+    if creds_file.exists():
+        try:
+            with open(creds_file, 'r') as f:
+                data = json.load(f)
+                credentials = data.get('credentials', {})
+                host_creds = credentials.get(hostname, {})
+                token = host_creds.get('token')
+                if token and token.strip():
+                    logging.debug(f"Token loaded from credentials file for hostname: {hostname}")
+                    return token.strip(), f"Credentials File ({creds_file})"
+        except json.JSONDecodeError as e:
+            logging.warning(f"Invalid JSON in credentials file {creds_file}: {e}")
+        except PermissionError as e:
+            logging.warning(f"Permission denied reading credentials file {creds_file}: {e}")
+        except Exception as e:
+            logging.warning(f"Error reading credentials file {creds_file}: {e}")
+    else:
+        logging.debug(f"Credentials file not found: {creds_file}")
+    
+    # Fallback to legacy environment variable
+    token = os.getenv("TFC_TOKEN")
+    if token and token.strip():
+        logging.debug("Token loaded from legacy TFC_TOKEN environment variable")
+        return token.strip(), "Environment Variable (TFC_TOKEN)"
+    
+    logging.debug("No token found from any source")
+    return None, "Not Found (Manual Entry Required)"
 
 
 # def get_no_code_modules():
@@ -69,7 +157,18 @@ def no_code_deploy():
         st.warning("no api configured")
         return
 
-    s_project = st.selectbox("Target Project", get_project_names())
+    # Get project names and check for saved selection
+    project_names = get_project_names()
+    saved_project = st.query_params.get('project')
+    default_project_index = 0
+    if saved_project and saved_project in project_names:
+        default_project_index = project_names.index(saved_project)
+    
+    s_project = st.selectbox("Target Project", project_names, index=default_project_index, key="project_select")
+    
+    # Persist project selection to query params
+    if s_project:
+        st.query_params['project'] = s_project
     
     st.markdown("## Infrastructure to deploy")
     cols = st.columns(NUM_COLUMNS)
@@ -248,29 +347,86 @@ def get_workspaces_by_project_id(project_id):
     return flat_workspaces
 
 def settings():
-    TFC_URL = os.getenv("TFC/E_URL", "https://app.terraform.io")
+    # Read persisted settings from query params
+    saved_url = st.query_params.get('url', os.getenv("TFC/E_URL", "https://app.terraform.io"))
+    saved_org = st.query_params.get('org', None)
+    
     with st.sidebar:    
-        url = st.text_input("TFC URL", value=TFC_URL)
-        token = st.text_input("TFC Token - https://app.terraform.io/app/settings/tokens", value=TFC_TOKEN, type="password")
+        url = st.text_input("TFC URL", value=saved_url)
+        
+        # Automatically discover token from Terraform credentials
+        discovered_token, token_source = get_terraform_token(url)
+        default_token = discovered_token if discovered_token else ""
+        
+        # Display token source information
+        if discovered_token:
+            st.info(f"🔑 Token source: {token_source}")
+        else:
+            st.info("💡 No token found. Enter manually or configure Terraform credentials.")
+        
+        token = st.text_input(
+            "TFC Token - https://app.terraform.io/app/settings/tokens",
+            value=default_token,
+            type="password",
+            help="Token can be loaded from TF_TOKEN_* environment variable, ~/.terraform.d/credentials.tfrc.json, or entered manually"
+        )
+        
         try:
             api = TFC(api_token=token, url=url)
             # api = TFC(api_token=token, url=url,log_level=logging.DEBUG)
             orgs_list = api.orgs.list()['data']
             org_names = [org['id'] for org in orgs_list]
-            org = st.selectbox("Organisation", org_names)
-        except:
-            st.error("Invalid token or URL")
+            
+            # Set default org from saved params if available
+            default_org_index = 0
+            if saved_org and saved_org in org_names:
+                default_org_index = org_names.index(saved_org)
+            
+            org = st.selectbox("Organisation", org_names, index=default_org_index)
+        except Exception as e:
+            st.error(f"Invalid token or URL: {str(e)}")
+            org = None
 
-        b_config = st.button("Configure / Refresh", use_container_width=True)
+        b_config = st.button("Apply configuration", use_container_width=True, type="primary")
         
-        if b_config:
+        if b_config and org:
+            # Persist settings to query params
+            st.query_params['url'] = url
+            st.query_params['org'] = org
+            
             api = TFC(api_token=token, url=url)
             api.set_org(org)
             st.session_state['api'] = api
             st.session_state['module_list'] = get_link_list()
             st.session_state['project_list'] = api.projects.list_all()
+        
+        # Clear cache and refresh button
+        b_clear = st.button("Clear cache and refresh", use_container_width=True, type="secondary")
+        if b_clear:
+            # Clear all session state
+            for key in ['api', 'module_list', 'project_list', 'deploy_module']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
             
 def display ():
+    # Auto-initialize from query params if API not configured
+    if 'api' not in st.session_state:
+        saved_url = st.query_params.get('url')
+        saved_org = st.query_params.get('org')
+        
+        if saved_url and saved_org:
+            # Attempt to restore configuration from saved params
+            discovered_token, _ = get_terraform_token(saved_url)
+            if discovered_token:
+                try:
+                    api = TFC(api_token=discovered_token, url=saved_url)
+                    api.set_org(saved_org)
+                    st.session_state['api'] = api
+                    st.session_state['module_list'] = get_link_list()
+                    st.session_state['project_list'] = api.projects.list_all()
+                except Exception:
+                    pass  # Silently fail, user will need to reconfigure
 
     if 'module_list' in st.session_state:
         logging.debug("using cached module list")
