@@ -1,4 +1,6 @@
-import json
+"""No-code workspace deployment payload generator for HCP Terraform."""
+
+from typing import Any
 
 # Example usage
 # vars = [
@@ -8,14 +10,24 @@ import json
 # generator = PayloadGenerator('no-code-workspace', 'A workspace to enable the No-Code provisioning workflow.', 'prj-yuEN6sJVra5t6XVy', vars)
 # print(generator.generate())
 
+
 class NoCodeDeploy:
-    def __init__(self, workspace_name, workspace_description, project_id, vars):
+    """Generates deployment payloads for HCP Terraform no-code workspaces."""
+
+    def __init__(
+        self, workspace_name: str, workspace_description: str, project_id: str, vars: list[dict[str, Any]]
+    ) -> None:
         self.workspace_name = workspace_name
         self.workspace_description = workspace_description
         self.project_id = project_id
         self.vars = vars
-        
-    def generate(self):
+
+    def generate(self) -> dict[str, Any]:
+        """Generate the API payload for no-code workspace deployment.
+
+        Returns:
+            Dictionary containing the workspace deployment payload
+        """
         payload = {
             "data": {
                 "type": "workspaces",
@@ -24,31 +36,24 @@ class NoCodeDeploy:
                     "description": self.workspace_description,
                 },
                 "relationships": {
-                    "project": {
-                        "data": {
-                            "id": self.project_id,
-                            "type": "project"
-                        }
-                    },
-                    "vars": {
-                        "data": []
-                    }
-                }
+                    "project": {"data": {"id": self.project_id, "type": "project"}},
+                    "vars": {"data": []},
+                },
             }
         }
-        
+
         for var in self.vars:
-            payload["data"]["relationships"]["vars"]["data"].append({
-                "type": "vars",
-                "attributes": {
-                    "key": var['key'],
-                    "value": var['value'],
-                    "category": var['category'],
-                    "hcl": False,
-                    "sensitive": False
+            payload["data"]["relationships"]["vars"]["data"].append(  # type: ignore[index]
+                {
+                    "type": "vars",
+                    "attributes": {
+                        "key": var["key"],
+                        "value": var["value"],
+                        "category": var["category"],
+                        "hcl": False,
+                        "sensitive": False,
+                    },
                 }
-            })
-        
+            )
+
         return payload
-
-

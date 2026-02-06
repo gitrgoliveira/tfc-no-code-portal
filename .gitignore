@@ -11,3 +11,5 @@ build/
 .streamlit/
 .vscode
 *.json
+.coverage
+out.py

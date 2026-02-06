@@ -1,0 +1,104 @@
+[project]
+name = "no-code-portal"
+version = "0.1.0"
+description = "Streamlit-based web application for deploying HCP Terraform no-code modules"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Select rulesets
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "S101",  # use of assert detected (okay for tests)
+    "S105",  # possible hardcoded password (false positives for test tokens)
+    "UP042", # StrEnum suggestion (prefer explicit str + Enum for clarity)
+]
+
+# Exclude directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "out.py",
+    "*.json",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # Allow assert in tests
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Gradual typing
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+exclude = ["^out\\.py$", "^.*\\.json$"]
+
+# Allow gradual adoption
+[[tool.mypy.overrides]]
+module = "streamlit.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "terrasnek.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "venv/*",
+    ".venv/*",
+    "*/site-packages/*",
+    "out.py",
+    "*.json",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

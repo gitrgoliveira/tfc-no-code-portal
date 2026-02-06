@@ -1,0 +1,36 @@
+# Pre-commit hooks for code quality enforcement
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # General file quality checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Python formatting with Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: ['--fix', '--exit-non-zero-on-fix']
+      # Run the formatter
+      - id: ruff-format
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-all]
+        args: ['--ignore-missing-imports', '--check-untyped-defs']
+        exclude: ^tests/
