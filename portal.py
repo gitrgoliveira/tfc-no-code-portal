@@ -90,7 +90,9 @@ def get_terraform_token(url: str = DEFAULT_TFC_URL) -> tuple[str | None, str]:
                 host_creds = credentials.get(hostname, {})
                 token = host_creds.get("token")
                 if token and token.strip():
-                    logging.debug(f"Token loaded from credentials file for hostname: {hostname}")
+                    logging.debug(
+                        f"Token loaded from credentials file for hostname: {hostname}"
+                    )
                     return token.strip(), f"Credentials File ({creds_file})"
         except (json.JSONDecodeError, PermissionError, OSError) as e:
             logging.warning(f"Error reading credentials file {creds_file}: {e}")
@@ -134,10 +136,16 @@ def _get_link_list_cached(url: str, token: str, org: str) -> list[dict[str, Any]
             attr = module["attributes"]
             latest_version = ""
             registry_origin = "private"
-            no_code_module_id = module["relationships"]["no-code-modules"]["data"][0]["id"]
-            no_code_module = _show_with_options_cached(url, token, org, no_code_module_id)
+            no_code_module_id = module["relationships"]["no-code-modules"]["data"][0][
+                "id"
+            ]
+            no_code_module = _show_with_options_cached(
+                url, token, org, no_code_module_id
+            )
             if len(attr["version-statuses"]) == 0:
-                logging.warning(f"No version detected. May be a public module:\n {module}")
+                logging.warning(
+                    f"No version detected. May be a public module:\n {module}"
+                )
                 logging.warning(no_code_module)
                 registry_origin = "public"
                 latest_version = no_code_module["data"]["attributes"]["version-pin"]
@@ -146,7 +154,12 @@ def _get_link_list_cached(url: str, token: str, org: str) -> list[dict[str, Any]
             link = f"https://{hostname}/app/{organization}/registry/modules/{registry_origin}/{attr['namespace']}/{attr['name']}/{attr['provider']}/{latest_version}/new-workspace"
             registry_link = f"https://{hostname}/api/registry/{registry_origin}/v2/modules/{attr['namespace']}/{attr['name']}/{attr['provider']}/metadata/{latest_version}?organization_name={organization}"
             no_code_list.append(
-                {"name": attr["name"], "link": link, "data": no_code_module, "registry_link": registry_link}
+                {
+                    "name": attr["name"],
+                    "link": link,
+                    "data": no_code_module,
+                    "registry_link": registry_link,
+                }
             )
 
     return no_code_list
@@ -172,7 +185,9 @@ def display_list() -> None:
     cols = st.columns(NUM_COLUMNS)
     for i, module in enumerate(st.session_state[SessionKeys.MODULE_LIST]):
         col = cols[i % NUM_COLUMNS]
-        col.link_button(label=module["name"], url=module["link"], width="stretch", type="primary")
+        col.link_button(
+            label=module["name"], url=module["link"], width="stretch", type="primary"
+        )
 
 
 def no_code_deploy() -> None:
@@ -188,7 +203,12 @@ def no_code_deploy() -> None:
     if saved_project and saved_project in project_names:
         default_project_index = project_names.index(saved_project)
 
-    s_project = st.selectbox("Target Project", project_names, index=default_project_index, key="project_select")
+    s_project = st.selectbox(
+        "Target Project",
+        project_names,
+        index=default_project_index,
+        key="project_select",
+    )
 
     # Persist project selection to query params
     if s_project:
@@ -199,7 +219,11 @@ def no_code_deploy() -> None:
     for i, module in enumerate(st.session_state[SessionKeys.MODULE_LIST]):
         col = cols[i % NUM_COLUMNS]
         if col.button(label=module["name"], use_container_width=True, type="primary"):
-            st.session_state[SessionKeys.DEPLOY_MODULE] = (module["name"], module["data"], module["registry_link"])
+            st.session_state[SessionKeys.DEPLOY_MODULE] = (
+                module["name"],
+                module["data"],
+                module["registry_link"],
+            )
 
     st.divider()
     if s_project:
@@ -214,7 +238,9 @@ def no_code_deploy() -> None:
 
 
 @st.cache_data(ttl=600, hash_funcs={"terrasnek.api.TFC": id})
-def _show_with_options_cached(url: str, token: str, org: str, module_id: str) -> dict[str, Any]:
+def _show_with_options_cached(
+    url: str, token: str, org: str, module_id: str
+) -> dict[str, Any]:
     """Cached no-code module options retrieval.
 
     Args:
@@ -245,14 +271,18 @@ def deploy_nocode_module(project: dict[str, Any]) -> None:
 
     deploy_form = st.form(key="deploy_form", border=True)
     api: TFC = st.session_state[SessionKeys.API]
-    (deploy_module_name, deploy_module_data, deploy_module_registry_link) = st.session_state[SessionKeys.DEPLOY_MODULE]
+    (deploy_module_name, deploy_module_data, deploy_module_registry_link) = (
+        st.session_state[SessionKeys.DEPLOY_MODULE]
+    )
     no_code_id = deploy_module_data["data"]["id"]
 
     deploy_form.markdown(f"## Deploy {deploy_module_name}")
     # random_chars = ''.join(random.choice(string.ascii_letters) for _ in range(3))
 
     ws_name = deploy_form.text_input(
-        "Workspace name", key=f"ws_name_{deploy_module_name}", value=f"{deploy_module_name}-"
+        "Workspace name",
+        key=f"ws_name_{deploy_module_name}",
+        value=f"{deploy_module_name}-",
     )
 
     # Validate workspace name
@@ -313,13 +343,22 @@ def deploy_nocode_module(project: dict[str, Any]) -> None:
             error = False
             deploy_result: Any
             try:
-                deploy_result = api.no_code_provisioning.deploy(no_code_id, payload=payload)
+                deploy_result = api.no_code_provisioning.deploy(
+                    no_code_id, payload=payload
+                )
             except Exception as ex:
                 error_message = str(ex)
                 if "already exists" in error_message.lower():
-                    st.error(f"❌ Workspace '{ws_name}' already exists. Please choose a different name.")
-                elif "unauthorized" in error_message.lower() or "forbidden" in error_message.lower():
-                    st.error("❌ Permission denied. Check your API token has sufficient permissions.")
+                    st.error(
+                        f"❌ Workspace '{ws_name}' already exists. Please choose a different name."
+                    )
+                elif (
+                    "unauthorized" in error_message.lower()
+                    or "forbidden" in error_message.lower()
+                ):
+                    st.error(
+                        "❌ Permission denied. Check your API token has sufficient permissions."
+                    )
                 else:
                     st.error(f"❌ Deployment failed: {error_message}")
                 error = True
@@ -348,7 +387,9 @@ def _get_registry_metadata_cached(registry_link: str) -> dict[str, Any]:
 
 
 @st.cache_data
-def extract_required_variables(registry_information: dict[str, Any]) -> list[dict[str, Any]]:
+def extract_required_variables(
+    registry_information: dict[str, Any],
+) -> list[dict[str, Any]]:
     required_vars = []
     for variable in registry_information["data"]["attributes"]["input-variables"]:
         if variable["required"]:
@@ -361,18 +402,32 @@ def display_workspaces(project_id: str) -> None:
     st.dataframe(
         data=(ws for ws in workspaces),
         hide_index=True,
-        column_order=["name", "tag-names", "source", "source-module-id", "no-code-upgrade-available", "self-html"],
+        column_order=[
+            "name",
+            "tag-names",
+            "source",
+            "source-module-id",
+            "no-code-upgrade-available",
+            "self-html",
+        ],
         column_config={
             "name": st.column_config.TextColumn("Name", width="medium"),
-            "self-html": st.column_config.LinkColumn("Link", display_text="Open Workspace", width="medium"),
-            "no-code-upgrade-available": st.column_config.CheckboxColumn("Upgrade Available", width="small"),
+            "self-html": st.column_config.LinkColumn(
+                "Link", display_text="Open Workspace", width="medium"
+            ),
+            "no-code-upgrade-available": st.column_config.CheckboxColumn(
+                "Upgrade Available", width="small"
+            ),
         },
         width="stretch",
     )
 
 
 def get_project_names() -> list[str]:
-    return [project["attributes"]["name"] for project in st.session_state[SessionKeys.PROJECT_LIST]["data"]]
+    return [
+        project["attributes"]["name"]
+        for project in st.session_state[SessionKeys.PROJECT_LIST]["data"]
+    ]
 
 
 def get_project_by_name(name: str) -> dict[str, Any] | None:
@@ -386,7 +441,9 @@ def get_project_by_name(name: str) -> dict[str, Any] | None:
 
 
 @st.cache_data(ttl=60, hash_funcs={"terrasnek.api.TFC": id})
-def _get_workspaces_cached(url: str, token: str, org: str, project_id: str) -> list[dict[str, Any]]:
+def _get_workspaces_cached(
+    url: str, token: str, org: str, project_id: str
+) -> list[dict[str, Any]]:
     """Cached workspace list retrieval.
 
     Args:
@@ -402,7 +459,9 @@ def _get_workspaces_cached(url: str, token: str, org: str, project_id: str) -> l
     if not api:
         return []
 
-    workspaces = api.workspaces.list_all(filters=[{"keys": ["project", "id"], "value": project_id}])
+    workspaces = api.workspaces.list_all(
+        filters=[{"keys": ["project", "id"], "value": project_id}]
+    )
     flat_workspaces = []
     for ws in workspaces["data"]:
         ws["attributes"]["id"] = ws["id"]
@@ -463,7 +522,9 @@ def _get_projects_cached(url: str, token: str, org: str) -> dict[str, Any]:
 
 def settings() -> None:
     # Read persisted settings from query params
-    saved_url = st.query_params.get(QueryParamKeys.URL, os.getenv(ENV_TFC_URL, DEFAULT_TFC_URL))
+    saved_url = st.query_params.get(
+        QueryParamKeys.URL, os.getenv(ENV_TFC_URL, DEFAULT_TFC_URL)
+    )
     saved_org = st.query_params.get(QueryParamKeys.ORG, None)
 
     with st.sidebar:
@@ -494,15 +555,23 @@ def settings() -> None:
             if saved_org and saved_org in org_names:
                 default_org_index = org_names.index(saved_org)
 
-            org = st.selectbox("Organisation", org_names, index=default_org_index) if org_names else None
+            org = (
+                st.selectbox("Organisation", org_names, index=default_org_index)
+                if org_names
+                else None
+            )
 
-            b_config = st.form_submit_button("Apply configuration", type="primary", use_container_width=True)
+            b_config = st.form_submit_button(
+                "Apply configuration", type="primary", use_container_width=True
+            )
 
         # Display info messages outside form
         if discovered_token:
             st.info(f"🔑 Token source: {token_source}")
         else:
-            st.info("💡 No token found. Enter manually or configure Terraform credentials.")
+            st.info(
+                "💡 No token found. Enter manually or configure Terraform credentials."
+            )
 
         # Display error messages if org fetch failed
         if token and not orgs_list:
@@ -516,15 +585,24 @@ def settings() -> None:
             api = create_tfc_client(token, url, org)
             st.session_state[SessionKeys.API] = api
             st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
-            st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(url, token, org)
+            st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(
+                url, token, org
+            )
 
         # Clear cache and refresh button (outside form)
-        b_clear = st.button("Clear cache and refresh", use_container_width=True, type="secondary")
+        b_clear = st.button(
+            "Clear cache and refresh", use_container_width=True, type="secondary"
+        )
         if b_clear:
             # Clear Streamlit cache
             st.cache_data.clear()
             # Clear all session state
-            for key in [SessionKeys.API, SessionKeys.MODULE_LIST, SessionKeys.PROJECT_LIST, SessionKeys.DEPLOY_MODULE]:
+            for key in [
+                SessionKeys.API,
+                SessionKeys.MODULE_LIST,
+                SessionKeys.PROJECT_LIST,
+                SessionKeys.DEPLOY_MODULE,
+            ]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
@@ -545,8 +623,12 @@ def display() -> None:
                     api = create_tfc_client(discovered_token, saved_url, saved_org)
                     st.session_state[SessionKeys.API] = api
                     st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
-                    st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(saved_url, discovered_token, saved_org)
-                    logging.info(f"Auto-initialized API from saved settings using {token_source}")
+                    st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(
+                        saved_url, discovered_token, saved_org
+                    )
+                    logging.info(
+                        f"Auto-initialized API from saved settings using {token_source}"
+                    )
                 except Exception as e:
                     auto_init_error = f"Failed to auto-initialize: {str(e)}"
                     logging.error(auto_init_error)
@@ -555,7 +637,9 @@ def display() -> None:
                 logging.warning(auto_init_error)
         elif not saved_org:
             # Try auto-initialization with default URL and discovered token
-            default_url = saved_url if saved_url else os.getenv(ENV_TFC_URL) or DEFAULT_TFC_URL
+            default_url = (
+                saved_url if saved_url else os.getenv(ENV_TFC_URL) or DEFAULT_TFC_URL
+            )
             discovered_token, token_source = get_terraform_token(default_url)
 
             if discovered_token:
@@ -574,11 +658,23 @@ def display() -> None:
                         # Initialize session state
                         st.session_state[SessionKeys.API] = api
                         st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
-                        st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(default_url, discovered_token, auto_org)
-                        org_msg = f"org '{auto_org}'" if len(orgs_list) == 1 else f"first org '{auto_org}' ({len(orgs_list)} available)"
-                        logging.info(f"Auto-initialized with {org_msg} using {token_source}")
+                        st.session_state[SessionKeys.PROJECT_LIST] = (
+                            _get_projects_cached(
+                                default_url, discovered_token, auto_org
+                            )
+                        )
+                        org_msg = (
+                            f"org '{auto_org}'"
+                            if len(orgs_list) == 1
+                            else f"first org '{auto_org}' ({len(orgs_list)} available)"
+                        )
+                        logging.info(
+                            f"Auto-initialized with {org_msg} using {token_source}"
+                        )
                 except Exception as e:
-                    logging.debug(f"Could not auto-initialize with default settings: {e}")
+                    logging.debug(
+                        f"Could not auto-initialize with default settings: {e}"
+                    )
 
     if SessionKeys.MODULE_LIST in st.session_state:
         logging.debug("using cached module list")
@@ -588,12 +684,16 @@ def display() -> None:
         saved_org = st.query_params.get(QueryParamKeys.ORG)
 
         if not saved_url and not saved_org:
-            st.info("👋 Welcome! Configure your HCP Terraform connection in the sidebar to get started.")
+            st.info(
+                "👋 Welcome! Configure your HCP Terraform connection in the sidebar to get started."
+            )
         elif auto_init_error:
             st.error(f"❌ Auto-initialization failed: {auto_init_error}")
             st.info("💡 Try reconfiguring your settings in the sidebar.")
         else:
-            st.warning("⚙️ Please complete the configuration in the sidebar and click 'Apply configuration'.")
+            st.warning(
+                "⚙️ Please complete the configuration in the sidebar and click 'Apply configuration'."
+            )
         return
 
     st.title("Self-service infrastructure portal")
