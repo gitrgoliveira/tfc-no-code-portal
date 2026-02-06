@@ -6,10 +6,15 @@ env/
 *.egg-info/
 dist/
 build/
+out.py
 
 # Streamlit
 .streamlit/
 .vscode
 *.json
 .coverage
-out.py
+
+# AI
+.agent*
+.playwright-mcp/*
+.DS_Store

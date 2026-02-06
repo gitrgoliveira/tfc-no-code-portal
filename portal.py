@@ -385,7 +385,7 @@ def get_project_by_name(name: str) -> dict[str, Any] | None:
     return None
 
 
-@st.cache_data(ttl=120, hash_funcs={"terrasnek.api.TFC": id})
+@st.cache_data(ttl=60, hash_funcs={"terrasnek.api.TFC": id})
 def _get_workspaces_cached(url: str, token: str, org: str, project_id: str) -> list[dict[str, Any]]:
     """Cached workspace list retrieval.
 
@@ -532,29 +532,71 @@ def settings() -> None:
 
 def display() -> None:
     # Auto-initialize from query params if API not configured
+    auto_init_error = None
     if SessionKeys.API not in st.session_state:
         saved_url = st.query_params.get(QueryParamKeys.URL)
         saved_org = st.query_params.get(QueryParamKeys.ORG)
 
         if saved_url and saved_org:
             # Attempt to restore configuration from saved params
-            discovered_token, _ = get_terraform_token(saved_url)
+            discovered_token, token_source = get_terraform_token(saved_url)
             if discovered_token:
                 try:
                     api = create_tfc_client(discovered_token, saved_url, saved_org)
                     st.session_state[SessionKeys.API] = api
                     st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
                     st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(saved_url, discovered_token, saved_org)
+                    logging.info(f"Auto-initialized API from saved settings using {token_source}")
                 except Exception as e:
-                    logging.debug(f"Failed to auto-initialize from query params: {e}")
+                    auto_init_error = f"Failed to auto-initialize: {str(e)}"
+                    logging.error(auto_init_error)
+            else:
+                auto_init_error = f"No token found. Token source: {token_source}"
+                logging.warning(auto_init_error)
+        elif not saved_org:
+            # Try auto-initialization with default URL and discovered token
+            default_url = saved_url if saved_url else os.getenv(ENV_TFC_URL) or DEFAULT_TFC_URL
+            discovered_token, token_source = get_terraform_token(default_url)
+
+            if discovered_token:
+                try:
+                    # Check if there's at least one organization
+                    orgs_list = _get_organizations_cached(default_url, discovered_token)
+                    if orgs_list:
+                        # Auto-select the first organization
+                        auto_org = orgs_list[0]["id"]
+                        api = create_tfc_client(discovered_token, default_url, auto_org)
+
+                        # Persist settings for future visits
+                        st.query_params[QueryParamKeys.URL] = default_url
+                        st.query_params[QueryParamKeys.ORG] = auto_org
+
+                        # Initialize session state
+                        st.session_state[SessionKeys.API] = api
+                        st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
+                        st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(default_url, discovered_token, auto_org)
+                        org_msg = f"org '{auto_org}'" if len(orgs_list) == 1 else f"first org '{auto_org}' ({len(orgs_list)} available)"
+                        logging.info(f"Auto-initialized with {org_msg} using {token_source}")
+                except Exception as e:
+                    logging.debug(f"Could not auto-initialize with default settings: {e}")
 
     if SessionKeys.MODULE_LIST in st.session_state:
         logging.debug("using cached module list")
     else:
-        st.error("Configure API and refresh to see modules")
+        # Provide context-aware error messages
+        saved_url = st.query_params.get(QueryParamKeys.URL)
+        saved_org = st.query_params.get(QueryParamKeys.ORG)
+
+        if not saved_url and not saved_org:
+            st.info("👋 Welcome! Configure your HCP Terraform connection in the sidebar to get started.")
+        elif auto_init_error:
+            st.error(f"❌ Auto-initialization failed: {auto_init_error}")
+            st.info("💡 Try reconfiguring your settings in the sidebar.")
+        else:
+            st.warning("⚙️ Please complete the configuration in the sidebar and click 'Apply configuration'.")
         return
 
-    st.title("Infrastructure Portal")
+    st.title("Self-service infrastructure portal")
 
     all, deploy = st.tabs(["HCP Terraform Workflow", "Direct Module Deployment"])
     with all:

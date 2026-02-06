@@ -1,4 +1,4 @@
-# No-Code Deployment Application with HCP Terraform
+# No-code deployment application with HCP Terraform
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -7,37 +7,60 @@
 
 ## Overview
 
-This is a no-code deployment application that leverages HCP Terraform to automate the provisioning and management of infrastructure resources. With this application, you can easily deploy and manage your infrastructure without writing any code.
+This is a no-code deployment application that leverages HCP Terraform to automate the provisioning and management of infrastructure resources. With this application, you can deploy and manage your infrastructure without writing any code.
 
 The application provides a user-friendly Streamlit interface that wraps the Terraform Cloud API (`terrasnek` library) to enable infrastructure deployment without direct HCP Terraform UI interaction.
 
 ## Features
 
-- **No-Code Deployment**: Deploy infrastructure resources through an intuitive web interface
-- **HCP Terraform Integration**: Automatic token discovery from multiple sources (environment variables, credentials file)
-- **Dynamic Form Generation**: Variable inputs auto-generated based on module requirements
-- **Workspace Management**: View and manage existing workspaces by project
-- **Input Validation**: Workspace names and variable values validated before deployment
-- **Multi-Project Support**: Deploy to different projects within your organization
-- **Settings Persistence**: URL parameters preserve configuration across page refreshes
+- **No-code deployment**: Deploy infrastructure resources through an intuitive web interface
+- **HCP Terraform integration**: Automatic token discovery from multiple sources (environment variables, credentials file)
+- **Dynamic form generation**: Variable inputs auto-generated based on module requirements
+- **Workspace management**: View and manage existing workspaces by project
+- **Input validation**: Workspace names and variable values validated before deployment
+- **Multi-project support**: Deploy to different projects within your organization
+- **Settings persistence**: URL parameters preserve configuration across page refreshes
+
+## Screenshots
+
+### Application interface
+
+The portal provides an intuitive interface for deploying no-code modules:
+
+![Configured Sidebar](assets/01-sidebar-configured.png)
+*Sidebar configuration showing automatic token discovery and organization selection*
+
+### Direct module deployment
+
+Select from available no-code modules and deploy infrastructure with a few clicks:
+
+![Module Grid](assets/02-module-grid.png)
+*Browse available no-code modules in the direct module deployment tab*
+
+### Deployment form
+
+Dynamic forms with some basic API validation ensure correct inputs before deployment:
+
+![Deployment Form](assets/03-deployment-form-detail.png)
+*Deployment form with workspace name validation and variable inputs*
 
 ## Prerequisites
 
 Before using this application, ensure you have:
 
-### HCP Terraform Requirements
+### HCP Terraform requirements
 - **Organization**: An HCP Terraform organization
 - **Token**: API token with appropriate permissions
 - **No-code modules**: At least one registry module marked as no-code
 
-### Local Requirements
+### Local requirements
 - **Python**: 3.11 or higher
 - **pip**: Package installer for Python
 - **Git**: Version control
 
 ## Installation
 
-### Quick Start
+### Quick start
 
 1. **Clone the repository**:
    ```bash
@@ -55,9 +78,9 @@ Before using this application, ensure you have:
    ```
 
 3. **Access the application**:
-   The application will automatically open in your browser at `http://localhost:8501`
+   The application automatically opens in your browser at `http://localhost:8501`
 
-### Development Installation
+### Development installation
 
 For development with testing and linting tools:
 
@@ -79,28 +102,32 @@ The application automatically discovers your HCP Terraform token from multiple s
 
 Alternatively, you can manually enter your token in the UI.
 
-### Basic Workflow
+### Basic workflow
 
-1. **Configure Settings** (Sidebar):
+1. **Configure settings** (Sidebar):
    - Enter HCP Terraform URL (defaults to https://app.terraform.io)
-   - Token will be auto-discovered or enter manually
+   - Token is auto-discovered or enter manually
    - Select your organization
    - Click "Apply configuration"
+   
+   Refer to the [application interface screenshot](#application-interface) for the configured sidebar.
 
-2. **Deploy Infrastructure**:
-   - Choose the "Direct Module Deployment" tab
+2. **Deploy infrastructure**:
+   - Choose the "Direct module deployment" tab
    - Select target project
    - Click a module to deploy
    - Enter workspace name and required variables
    - Click "Deploy"
+   
+   Refer to the [direct module deployment](#direct-module-deployment) and [deployment form](#deployment-form) screenshots.
 
-3. **View Workspaces**:
-   - Current infrastructure displayed by project
+3. **View workspaces**:
+   - Current infrastructure is displayed by project
    - Click workspace links to open in HCP Terraform
 
 ## Development
 
-### Available Commands
+### Available commands
 
 ```bash
 make help            # Show all available commands
@@ -113,7 +140,7 @@ make verify          # Run all quality checks
 make clean           # Clean up generated files
 ```
 
-### Running Tests
+### Running tests
 
 ```bash
 make test            # Full test suite with coverage
@@ -122,7 +149,7 @@ make test-quick      # Quick tests without coverage
 
 View coverage report: `open htmlcov/index.html`
 
-### Code Quality
+### Code quality
 
 The project uses:
 - **ruff**: Fast Python linter and formatter
@@ -135,7 +162,7 @@ Run all quality checks:
 make verify
 ```
 
-### Project Structure
+### Project structure
 
 ```
 .
@@ -151,11 +178,11 @@ make verify
 └── Makefile            # Development commands
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
+Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
 
 ## Troubleshooting
 
-### Token Not Found
+### Token not found
 
 ```bash
 # Set token environment variable
@@ -165,13 +192,13 @@ export TF_TOKEN_app_terraform_io="your-token-here"
 terraform login
 ```
 
-### Connection Errors
+### Connection errors
 
 - Verify HCP Terraform URL is correct
 - Check network connectivity
 - Ensure token has required permissions
 
-### Module Not Appearing
+### Module not appearing
 
 - Ensure module is marked as "no-code" in registry
 - Verify you have access to the module's organization
@@ -179,7 +206,7 @@ terraform login
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+Contributions are welcome! Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Development setup instructions
 - Code style guidelines
 - Testing requirements
@@ -193,7 +220,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the MIT License. Refer to the [LICENSE.md](LICENSE.md) file for details.
 
 ## Support
 
