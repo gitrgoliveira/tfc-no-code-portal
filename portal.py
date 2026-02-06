@@ -23,6 +23,7 @@ from utils import create_tfc_client
 from validation import sanitize_variable_value, validate_workspace_name
 
 
+@st.cache_data(ttl=300)
 def get_credentials_file_path() -> Path:
     """Get the Terraform credentials file path based on OS.
 
@@ -37,6 +38,7 @@ def get_credentials_file_path() -> Path:
     return home / ".terraform.d" / "credentials.tfrc.json"
 
 
+@st.cache_data
 def extract_hostname(url: str) -> str:
     """Extract hostname from URL for credential lookup.
 
@@ -54,6 +56,7 @@ def extract_hostname(url: str) -> str:
     return hostname.lower().strip("/")
 
 
+@st.cache_data(ttl=300)
 def get_terraform_token(url: str = DEFAULT_TFC_URL) -> tuple[str | None, str]:
     """Get Terraform token from multiple sources with priority.
 
@@ -104,12 +107,22 @@ def get_terraform_token(url: str = DEFAULT_TFC_URL) -> tuple[str | None, str]:
     return None, "Not Found (Manual Entry Required)"
 
 
-def get_link_list() -> list[dict[str, Any]]:
-    if not st.session_state.get(SessionKeys.API, False):
-        logging.error("no api configured")
+@st.cache_data(ttl=600, hash_funcs={"terrasnek.api.TFC": id})
+def _get_link_list_cached(url: str, token: str, org: str) -> list[dict[str, Any]]:
+    """Cached module list retrieval.
+
+    Args:
+        url: HCP Terraform URL
+        token: API token
+        org: Organization name
+
+    Returns:
+        List of no-code modules with metadata
+    """
+    api = create_tfc_client(token, url, org)
+    if not api:
         return []
 
-    api: TFC = st.session_state[SessionKeys.API]
     no_code_list = []
     ## get all the modules from Terraform Cloud
     module_list = api.registry_modules.list_all()
@@ -122,7 +135,7 @@ def get_link_list() -> list[dict[str, Any]]:
             latest_version = ""
             registry_origin = "private"
             no_code_module_id = module["relationships"]["no-code-modules"]["data"][0]["id"]
-            no_code_module = show_with_options(api, no_code_module_id)
+            no_code_module = _show_with_options_cached(url, token, org, no_code_module_id)
             if len(attr["version-statuses"]) == 0:
                 logging.warning(f"No version detected. May be a public module:\n {module}")
                 logging.warning(no_code_module)
@@ -137,6 +150,19 @@ def get_link_list() -> list[dict[str, Any]]:
             )
 
     return no_code_list
+
+
+def get_link_list() -> list[dict[str, Any]]:
+    if not st.session_state.get(SessionKeys.API, False):
+        logging.error("no api configured")
+        return []
+
+    api: TFC = st.session_state[SessionKeys.API]
+    url = api.get_url()
+    org = str(api.get_org())  # Safe cast - API validated before this point
+    token = str(api._token)  # Safe cast - API validated before this point
+
+    return _get_link_list_cached(url, token, org)
 
 
 def display_list() -> None:
@@ -187,9 +213,32 @@ def no_code_deploy() -> None:
                 deploy_nocode_module(project)
 
 
+@st.cache_data(ttl=600, hash_funcs={"terrasnek.api.TFC": id})
+def _show_with_options_cached(url: str, token: str, org: str, module_id: str) -> dict[str, Any]:
+    """Cached no-code module options retrieval.
+
+    Args:
+        url: HCP Terraform URL
+        token: API token
+        org: Organization name
+        module_id: No-code module ID
+
+    Returns:
+        Module options data
+    """
+    api = create_tfc_client(token, url, org)
+    if not api:
+        return {}
+
+    api_url = f"{api.no_code_provisioning._no_code_base_url}/{module_id}"
+    return api.no_code_provisioning._show(url=api_url, include=["variable_options"])  # type: ignore[no-any-return]
+
+
 def show_with_options(api: TFC, module_id: str):
-    url = f"{api.no_code_provisioning._no_code_base_url}/{module_id}"
-    return api.no_code_provisioning._show(url=url, include=["variable_options"])
+    url = api.get_url()
+    org = str(api.get_org())  # Safe cast - API validated before this point
+    token = str(api._token)  # Safe cast - API validated before this point
+    return _show_with_options_cached(url, token, org, module_id)
 
 
 def deploy_nocode_module(project: dict[str, Any]) -> None:
@@ -213,10 +262,7 @@ def deploy_nocode_module(project: dict[str, Any]) -> None:
     elif ws_name:
         deploy_form.success("✅ Valid workspace name")
 
-    # Fetch no-code options (for future use)
-    show_with_options(api, no_code_id)
-
-    registry_information = api._get(deploy_module_registry_link)
+    registry_information = _get_registry_metadata_cached(deploy_module_registry_link)
     required_vars = extract_required_variables(registry_information)
     input_vars = []
 
@@ -287,6 +333,21 @@ def deploy_nocode_module(project: dict[str, Any]) -> None:
                 )
 
 
+@st.cache_data(ttl=600)
+def _get_registry_metadata_cached(registry_link: str) -> dict[str, Any]:
+    """Cached registry metadata retrieval.
+
+    Args:
+        registry_link: Registry metadata API URL
+
+    Returns:
+        Module metadata including input variables
+    """
+    api: TFC = st.session_state[SessionKeys.API]
+    return api._get(registry_link)  # type: ignore[no-any-return]
+
+
+@st.cache_data
 def extract_required_variables(registry_information: dict[str, Any]) -> list[dict[str, Any]]:
     required_vars = []
     for variable in registry_information["data"]["attributes"]["input-variables"]:
@@ -324,14 +385,27 @@ def get_project_by_name(name: str) -> dict[str, Any] | None:
     return None
 
 
-def get_workspaces_by_project_id(project_id: str) -> list[dict[str, Any]]:
-    api: TFC = st.session_state[SessionKeys.API]
+@st.cache_data(ttl=120, hash_funcs={"terrasnek.api.TFC": id})
+def _get_workspaces_cached(url: str, token: str, org: str, project_id: str) -> list[dict[str, Any]]:
+    """Cached workspace list retrieval.
+
+    Args:
+        url: HCP Terraform URL
+        token: API token
+        org: Organization name
+        project_id: Project ID to filter workspaces
+
+    Returns:
+        List of workspaces with flattened attributes
+    """
+    api = create_tfc_client(token, url, org)
+    if not api:
+        return []
 
     workspaces = api.workspaces.list_all(filters=[{"keys": ["project", "id"], "value": project_id}])
     flat_workspaces = []
     for ws in workspaces["data"]:
         ws["attributes"]["id"] = ws["id"]
-
         ws["attributes"].update(ws["links"])
         flat_workspaces.append(ws["attributes"])
 
@@ -341,36 +415,78 @@ def get_workspaces_by_project_id(project_id: str) -> list[dict[str, Any]]:
     return flat_workspaces
 
 
+def get_workspaces_by_project_id(project_id: str) -> list[dict[str, Any]]:
+    api: TFC = st.session_state[SessionKeys.API]
+    url = api.get_url()
+    org = str(api.get_org())  # Safe cast - API validated before this point
+    token = str(api._token)  # Safe cast - API validated before this point
+
+    return _get_workspaces_cached(url, token, org, project_id)
+
+
+@st.cache_data(ttl=300)
+def _get_organizations_cached(url: str, token: str) -> list[dict[str, Any]]:
+    """Cached organization list retrieval.
+
+    Args:
+        url: HCP Terraform URL
+        token: API token
+
+    Returns:
+        List of organizations
+    """
+    try:
+        api = TFC(api_token=token, url=url)
+        orgs_list = api.orgs.list()["data"]
+        return orgs_list  # type: ignore[no-any-return]
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=300)
+def _get_projects_cached(url: str, token: str, org: str) -> dict[str, Any]:
+    """Cached project list retrieval.
+
+    Args:
+        url: HCP Terraform URL
+        token: API token
+        org: Organization name
+
+    Returns:
+        Project list data
+    """
+    api = create_tfc_client(token, url, org)
+    if not api:
+        return {"data": []}
+    return api.projects.list_all()  # type: ignore[no-any-return]
+
+
 def settings() -> None:
     # Read persisted settings from query params
     saved_url = st.query_params.get(QueryParamKeys.URL, os.getenv(ENV_TFC_URL, DEFAULT_TFC_URL))
     saved_org = st.query_params.get(QueryParamKeys.ORG, None)
 
     with st.sidebar:
-        url = st.text_input("TFC URL", value=saved_url)
+        # Wrap settings in form to prevent reruns during typing
+        with st.form("settings_form", border=False):
+            url = st.text_input("TFC URL", value=saved_url)
 
-        # Automatically discover token from Terraform credentials
-        discovered_token, token_source = get_terraform_token(url)
-        default_token = discovered_token if discovered_token else ""
+            # Automatically discover token from Terraform credentials
+            discovered_token, token_source = get_terraform_token(url)
+            default_token = discovered_token if discovered_token else ""
 
-        # Display token source information
-        if discovered_token:
-            st.info(f"🔑 Token source: {token_source}")
-        else:
-            st.info("💡 No token found. Enter manually or configure Terraform credentials.")
+            # Display token source information outside form (doesn't trigger rerun)
+            token = st.text_input(
+                "TFC Token - https://app.terraform.io/app/settings/tokens",
+                value=default_token,
+                type="password",
+                help="Token can be loaded from TF_TOKEN_* environment variable, ~/.terraform.d/credentials.tfrc.json, or entered manually",
+            )
 
-        token = st.text_input(
-            "TFC Token - https://app.terraform.io/app/settings/tokens",
-            value=default_token,
-            type="password",
-            help="Token can be loaded from TF_TOKEN_* environment variable, ~/.terraform.d/credentials.tfrc.json, or entered manually",
-        )
+            token = token if token else ""  # Ensure token is not None
 
-        token = token if token else ""  # Ensure token is not None
-
-        try:
-            api = TFC(api_token=token, url=url)
-            orgs_list = api.orgs.list()["data"]
+            # Fetch organizations using cached function
+            orgs_list = _get_organizations_cached(url, token) if token else []
             org_names = [org["id"] for org in orgs_list]
 
             # Set default org from saved params if available
@@ -378,21 +494,19 @@ def settings() -> None:
             if saved_org and saved_org in org_names:
                 default_org_index = org_names.index(saved_org)
 
-            org = st.selectbox("Organisation", org_names, index=default_org_index)
-        except ConnectionError:
-            st.error("❌ Cannot connect to HCP Terraform. Check your URL and network connection.")
-            org = None
-        except Exception as e:
-            error_msg = str(e)
-            if "401" in error_msg or "unauthorized" in error_msg.lower():
-                st.error("❌ Invalid API token. Generate a new token at https://app.terraform.io/app/settings/tokens")
-            elif "404" in error_msg:
-                st.error("❌ URL not found. Check your HCP Terraform URL is correct.")
-            else:
-                st.error(f"❌ Error connecting to HCP Terraform: {error_msg}")
-            org = None
+            org = st.selectbox("Organisation", org_names, index=default_org_index) if org_names else None
 
-        b_config = st.button("Apply configuration", width="stretch", type="primary")
+            b_config = st.form_submit_button("Apply configuration", type="primary", use_container_width=True)
+
+        # Display info messages outside form
+        if discovered_token:
+            st.info(f"🔑 Token source: {token_source}")
+        else:
+            st.info("💡 No token found. Enter manually or configure Terraform credentials.")
+
+        # Display error messages if org fetch failed
+        if token and not orgs_list:
+            st.error("❌ Invalid token or unable to connect to HCP Terraform")
 
         if b_config and org:
             # Persist settings to query params
@@ -402,11 +516,13 @@ def settings() -> None:
             api = create_tfc_client(token, url, org)
             st.session_state[SessionKeys.API] = api
             st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
-            st.session_state[SessionKeys.PROJECT_LIST] = api.projects.list_all()
+            st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(url, token, org)
 
-        # Clear cache and refresh button
-        b_clear = st.button("Clear cache and refresh", width="stretch", type="secondary")
+        # Clear cache and refresh button (outside form)
+        b_clear = st.button("Clear cache and refresh", use_container_width=True, type="secondary")
         if b_clear:
+            # Clear Streamlit cache
+            st.cache_data.clear()
             # Clear all session state
             for key in [SessionKeys.API, SessionKeys.MODULE_LIST, SessionKeys.PROJECT_LIST, SessionKeys.DEPLOY_MODULE]:
                 if key in st.session_state:
@@ -428,7 +544,7 @@ def display() -> None:
                     api = create_tfc_client(discovered_token, saved_url, saved_org)
                     st.session_state[SessionKeys.API] = api
                     st.session_state[SessionKeys.MODULE_LIST] = get_link_list()
-                    st.session_state[SessionKeys.PROJECT_LIST] = api.projects.list_all()
+                    st.session_state[SessionKeys.PROJECT_LIST] = _get_projects_cached(saved_url, discovered_token, saved_org)
                 except Exception as e:
                     logging.debug(f"Failed to auto-initialize from query params: {e}")
 

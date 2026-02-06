@@ -4,6 +4,15 @@ import json
 from unittest.mock import Mock
 
 import pytest
+import streamlit as st
+
+
+@pytest.fixture(autouse=True)
+def clear_streamlit_cache():
+    """Clear Streamlit cache before each test to ensure test isolation."""
+    st.cache_data.clear()
+    yield
+    st.cache_data.clear()
 
 
 @pytest.fixture
