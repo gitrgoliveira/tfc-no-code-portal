@@ -6,7 +6,7 @@ Thank you for your interest in contributing to this project! This guide will hel
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11 or higher (3.14 recommended)
 - pip and venv
 - Git
 
@@ -67,10 +67,32 @@ make format        # Format all code
 make type-check    # Run mypy type checker
 ```
 
+#### Security Checks
+
+```bash
+make audit         # Sync the venv to requirements.txt, then check it for known vulnerabilities (pip-audit)
+make bandit        # Scan the code for security issues (bandit, configured in pyproject.toml)
+```
+
+CI runs both on every push and pull request, and weekly on `main` so new advisories surface even when nothing
+changes. When the audit reports a vulnerable package, upgrade just that package and commit the new lock:
+
+```bash
+make upgrade-package PKG=<package>
+```
+
+If an advisory has no fixed release yet (or the fix is blocked by another dependency's constraints), accept it
+explicitly in the `Makefile`, with the reason and a link, and remove the line once a fix ships. CI reads the same
+list:
+
+```make
+PIP_AUDIT_IGNORE += --ignore-vuln GHSA-xxxx-xxxx-xxxx  # <package>: no fix yet, <advisory link>
+```
+
 #### Run All Checks
 
 ```bash
-make verify        # Runs lint, type-check, and tests
+make verify        # Everything CI runs: lint, format-check, type-check, test, audit, bandit
 ```
 
 ### Testing
@@ -84,13 +106,29 @@ View HTML coverage report: `open htmlcov/index.html`
 
 ### Pre-commit Hooks
 
-Pre-commit hooks run automatically before each commit. To run them manually:
+Pre-commit hooks run automatically before each commit. The ruff and mypy hooks run the venv's pinned tools
+(the same versions as `make lint`, `make type-check` and CI), so commit with the virtual environment activated.
+To run the hooks manually:
 
 ```bash
 make pre-commit
 ```
 
 If hooks fail, fix the issues and try committing again.
+
+### Dependencies
+
+`requirements.in` lists the direct dependencies; `requirements.txt` is the lock generated from it with
+`uv pip compile --universal --python-version 3.11`, so a single file works on every OS and on Python 3.11+.
+Always regenerate it through `make`:
+
+```bash
+make update-requirements           # Upgrade every pin
+make upgrade-package PKG=<package> # Upgrade one pin, keeping the rest unchanged
+```
+
+After `git pull` or a lock change, the next `make` target that uses the venv reinstalls it from the new
+`requirements.txt`.
 
 ## Code Style Guidelines
 
@@ -118,11 +156,11 @@ Always add type hints to new functions:
 ```python
 def process_workspace(name: str, config: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Process workspace configuration.
-    
+
     Args:
         name: Workspace name
         config: Configuration dictionary
-        
+
     Returns:
         Processed configuration or None if validation fails
     """
@@ -216,15 +254,15 @@ except ConnectionError:
 ```python
 class TestFeatureName:
     """Tests for feature description."""
-    
+
     def test_basic_functionality(self):
         """Test the happy path."""
         ...
-    
+
     def test_error_handling(self):
         """Test error conditions."""
         ...
-    
+
     def test_edge_cases(self):
         """Test boundary conditions."""
         ...

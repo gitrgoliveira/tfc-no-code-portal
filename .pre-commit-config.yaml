@@ -8,6 +8,7 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']  # keep Markdown hard line breaks
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
@@ -16,21 +17,27 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Python formatting with Ruff
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.15
+  # Ruff and mypy run from the venv, i.e. the versions pinned in requirements.txt, exactly as
+  # `make lint`, `make format-check`, `make type-check` and CI run them, so there is no second
+  # version to keep in sync (and mypy sees the project's dependencies, e.g. streamlit's types).
+  # Requires the venv on PATH: activate it (`source venv/bin/activate`) or use `make pre-commit`.
+  - repo: local
     hooks:
-      # Run the linter
-      - id: ruff
-        args: ['--fix', '--exit-non-zero-on-fix']
-      # Run the formatter
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --force-exclude --fix --exit-non-zero-on-fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
       - id: ruff-format
-
-  # Type checking with mypy
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
+        name: ruff format
+        entry: ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
       - id: mypy
-        additional_dependencies: [types-all]
-        args: ['--ignore-missing-imports', '--check-untyped-defs']
-        exclude: ^tests/
+        name: mypy
+        entry: mypy . --ignore-missing-imports --check-untyped-defs
+        language: system
+        types: [python]
+        pass_filenames: false

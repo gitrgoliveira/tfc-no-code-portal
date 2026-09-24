@@ -13,6 +13,8 @@ out.py
 .vscode
 *.json
 .coverage
+coverage.xml
+htmlcov/
 
 # AI
 .agent*
