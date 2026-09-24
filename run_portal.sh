@@ -2,7 +2,7 @@
 
 if [ -d "venv" ]; then
     echo "Directory 'env' already exists."
-else 
+else
     python3 -m venv venv
 fi
 source venv/bin/activate
