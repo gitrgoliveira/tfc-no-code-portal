@@ -6,7 +6,7 @@ Thank you for your interest in contributing to this project! This guide will hel
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11 or higher (3.14 recommended)
 - pip and venv
 - Git
 

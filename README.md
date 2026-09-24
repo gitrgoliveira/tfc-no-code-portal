@@ -54,7 +54,7 @@ Before using this application, ensure you have:
 - **No-code modules**: At least one registry module marked as no-code
 
 ### Local requirements
-- **Python**: 3.11 or higher
+- **Python**: 3.11 or higher (3.14 recommended)
 - **pip**: Package installer for Python
 - **Git**: Version control
 
