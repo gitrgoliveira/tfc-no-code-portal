@@ -1,4 +1,4 @@
-.PHONY: requirements run clean test lint format type-check pre-commit install-dev help
+.PHONY: requirements run clean test lint format type-check audit pre-commit install-dev help
 
 VENV := venv
 PYTHON := $(VENV)/bin/python
@@ -68,6 +68,11 @@ format-check: $(VENV)  ## Check code formatting without changes
 type-check: $(VENV)  ## Run mypy type checker
 	@echo "Running type checker..."
 	$(VENV)/bin/mypy . --ignore-missing-imports --check-untyped-defs
+
+audit: $(VENV)  ## Audit pinned dependencies for known vulnerabilities
+	@echo "Auditing dependencies..."
+	$(PIP) install pip-audit
+	$(VENV)/bin/pip-audit -r requirements.txt
 
 pre-commit: $(VENV)  ## Run all pre-commit hooks
 	@echo "Running pre-commit hooks..."

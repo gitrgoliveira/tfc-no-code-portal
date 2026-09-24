@@ -136,6 +136,7 @@ make test            # Run tests with coverage
 make lint            # Run code linter
 make format          # Format code
 make type-check      # Run type checker
+make audit           # Audit dependencies for known vulnerabilities
 make verify          # Run all quality checks
 make clean           # Clean up generated files
 ```

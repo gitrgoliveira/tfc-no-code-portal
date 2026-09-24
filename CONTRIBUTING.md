@@ -67,6 +67,18 @@ make format        # Format all code
 make type-check    # Run mypy type checker
 ```
 
+#### Dependency Audit
+
+```bash
+make audit         # Check requirements.txt for known vulnerabilities (pip-audit)
+```
+
+CI runs the same audit and fails if a pinned dependency has a known vulnerability. To fix one, upgrade just that package:
+
+```bash
+pip-compile --upgrade-package <package> requirements.in -o requirements.txt
+```
+
 #### Run All Checks
 
 ```bash

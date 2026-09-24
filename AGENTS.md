@@ -22,12 +22,17 @@ python -m streamlit run portal.py
 
 ### Dependency Management
 ```bash
-make requirements          # Updates requirements.txt from requirements.in using pip-compile
+make update-requirements   # Updates requirements.txt from requirements.in using pip-compile
+make requirements          # Installs/syncs dependencies from requirements.txt
+make audit                 # Audits requirements.txt for known vulnerabilities (pip-audit, also run in CI)
 
 # Manual workflow
 pip install pip-tools
 pip-compile --upgrade requirements.in -o requirements.txt
 pip install -r requirements.txt
+
+# Security fix for a single package (keeps other pins unchanged)
+pip-compile --upgrade-package <package> requirements.in -o requirements.txt
 ```
 
 ### Testing
