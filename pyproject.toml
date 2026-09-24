@@ -7,6 +7,8 @@ requires-python = ">=3.11"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# Markdown code blocks are illustrative snippets, not project code; ruff 0.16+ would otherwise format them
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 # Select rulesets
@@ -68,6 +70,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "terrasnek.*"
 ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+# B105 flags the TF_TOKEN_/TFC_TOKEN environment variable *names*; mirrors ruff's S105 ignore above
+skips = ["B105"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
