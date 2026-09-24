@@ -109,7 +109,7 @@ Alternatively, you can manually enter your token in the UI.
    - Token is auto-discovered or enter manually
    - Select your organization
    - Click "Apply configuration"
-   
+
    Refer to the [application interface screenshot](#application-interface) for the configured sidebar.
 
 2. **Deploy infrastructure**:
@@ -118,7 +118,7 @@ Alternatively, you can manually enter your token in the UI.
    - Click a module to deploy
    - Enter workspace name and required variables
    - Click "Deploy"
-   
+
    Refer to the [direct module deployment](#direct-module-deployment) and [deployment form](#deployment-form) screenshots.
 
 3. **View workspaces**:
@@ -137,7 +137,9 @@ make lint            # Run code linter
 make format          # Format code
 make type-check      # Run type checker
 make audit           # Audit dependencies for known vulnerabilities
-make verify          # Run all quality checks
+make bandit          # Scan code for security issues
+make verify          # Run all quality checks (everything CI runs)
+make upgrade-package PKG=<name>  # Upgrade one dependency pin
 make clean           # Clean up generated files
 ```
 
@@ -156,6 +158,8 @@ The project uses:
 - **ruff**: Fast Python linter and formatter
 - **mypy**: Static type checker
 - **pytest**: Testing framework
+- **pip-audit** and **bandit**: Dependency and code security scanning
+- **uv**: Compiles the universal `requirements.txt` lock
 - **pre-commit**: Git hooks for quality checks
 
 Run all quality checks:
@@ -227,4 +231,3 @@ This project is licensed under the MIT License. Refer to the [LICENSE.md](LICENS
 
 - **Issues**: [GitHub Issues](https://github.com/gitrgoliveira/tfc-no-code-portal/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/gitrgoliveira/tfc-no-code-portal/discussions)
-

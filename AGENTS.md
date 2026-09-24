@@ -21,82 +21,79 @@ python -m streamlit run portal.py
 ```
 
 ### Dependency Management
+`requirements.in` lists direct dependencies (app and dev tools); `requirements.txt` is the lock generated
+from it. The lock is universal (`uv pip compile --universal --python-version 3.11`): one file for every OS
+and for Python 3.11+. Never regenerate it with plain `pip-compile` or `pip freeze`.
 ```bash
-make update-requirements   # Updates requirements.txt from requirements.in using pip-compile
-make requirements          # Installs/syncs dependencies from requirements.txt
-make audit                 # Audits requirements.txt for known vulnerabilities (pip-audit, also run in CI)
-
-# Manual workflow
-pip install pip-tools
-pip-compile --upgrade requirements.in -o requirements.txt
-pip install -r requirements.txt
-
-# Security fix for a single package (keeps other pins unchanged)
-pip-compile --upgrade-package <package> requirements.in -o requirements.txt
+make update-requirements          # Upgrade every pin in requirements.txt
+make upgrade-package PKG=<name>   # Upgrade one pin (e.g. a security fix), keeping the rest unchanged
+make requirements                 # Force a reinstall of the venv from requirements.txt
+make audit                        # Sync the venv, then audit requirements.txt with pip-audit (also run in CI)
 ```
+Every make target that uses the venv reinstalls it automatically when `requirements.txt` changes. To accept an advisory
+that has no fix yet, add `PIP_AUDIT_IGNORE += --ignore-vuln <ID>  # reason, link` in the Makefile (CI uses
+the same list).
 
 ### Testing
-**Status: No test framework configured**
-- No pytest, unittest, or other testing tools present
-- No test files exist in the repository
-- If adding tests, recommend: `pytest tests/test_*.py -v`
-
-### Linting and Formatting
-**Status: No linting/formatting tools configured**
-- No black, flake8, ruff, mypy, pylint, or isort configured
-- No configuration files (pyproject.toml, .flake8, .pylintrc)
-- Code style is maintained manually via comprehensive `.github/copilot-instructions.md`
-
-**Recommendation**: If adding linting, use:
+pytest with pytest-cov and pytest-mock, configured in `pyproject.toml`. Tests live in `tests/`
+(`test_auth.py`, `test_payload.py`, `test_utils.py`, `test_validation.py`, `test_tooling.py`), with shared
+fixtures in `tests/conftest.py`.
 ```bash
-# Formatting
-black portal.py no_code.py
-
-# Linting
-ruff check portal.py no_code.py
-
-# Type checking
-mypy portal.py no_code.py --ignore-missing-imports
+make test          # All tests with coverage
+make test-quick    # All tests, no coverage
 ```
 
 ### Running Single Tests
-N/A - No test framework configured. To add testing:
 ```bash
-# Example pytest commands (not currently available)
-pytest tests/test_portal.py::test_function_name -v
-pytest tests/test_portal.py -k "test_pattern" -v
+venv/bin/pytest tests/test_auth.py::TestGetTerraformToken::test_no_token_found -v
+venv/bin/pytest tests/test_validation.py -k "workspace_name" -v
+```
+
+### Linting, Formatting, Type Checking and Security
+All tools are pinned in `requirements.txt` and configured in `pyproject.toml`; CI runs the same versions.
+```bash
+make lint          # ruff check (pycodestyle, pyflakes, isort, bugbear, bandit, comprehensions, pyupgrade rules)
+make format        # ruff format (make format-check to verify only)
+make type-check    # mypy
+make bandit        # bandit security scan
+make verify        # Everything CI runs: lint, format-check, type-check, test, audit, bandit
+make pre-commit    # Pre-commit hooks (installed by make install-dev)
 ```
 
 ## Architecture and Project Structure
 
 ```
-/Users/ricardo/repos/no-code-portal/
-├── portal.py              # Main application (458 lines) - all UI and business logic
-├── no_code.py            # Payload generator (55 lines) - workspace creation payloads
-├── out.py                # Sample data/reference (not actively used)
-├── requirements.in       # Minimal dependencies (2 packages: terrasnek, streamlit)
-├── requirements.txt      # Pinned dependencies (auto-generated via pip-compile)
-├── Makefile             # Build/run automation
-├── run_portal.sh        # Alternative startup script
-├── README.md            # User documentation
-├── .gitignore           # Python/Streamlit exclusions
+.
+├── portal.py              # Main Streamlit application - UI and business logic
+├── no_code.py             # Payload generator - workspace creation payloads
+├── constants.py           # Application constants and enums
+├── utils.py               # Shared helpers (TFC client creation, attribute flattening)
+├── validation.py          # Input validation and sanitisation
+├── tests/                 # pytest suite (conftest.py + test_*.py)
+├── pyproject.toml         # ruff, mypy, bandit, pytest and coverage configuration
+├── requirements.in        # Direct dependencies (terrasnek, streamlit, dev tools)
+├── requirements.txt       # Universal lock generated from requirements.in (uv pip compile)
+├── Makefile               # Build/run/check automation (make help)
+├── run_portal.sh          # Alternative startup script
+├── .pre-commit-config.yaml
 ├── .github/
-│   └── copilot-instructions.md  # Comprehensive AI agent instructions (152 lines)
-├── venv/                # Virtual environment (not in git)
-└── __pycache__/         # Compiled Python files (not in git)
+│   ├── copilot-instructions.md  # Detailed AI agent instructions
+│   └── workflows/ci.yml         # CI: lint, type-check, test matrix, security scan (+ weekly run)
+└── venv/                  # Virtual environment (not in git)
 ```
 
 ### Key Components (portal.py)
-- **Authentication (lines 20-103)**: Three-tier token discovery (env vars → credentials file → legacy)
-- **Module Discovery (lines 111-145)**: Fetch and filter no-code modules from HCP Terraform
-- **Settings/Persistence (lines 349-411)**: Sidebar configuration with query param persistence
-- **Deployment Workflow (lines 154-299)**: Dynamic form generation and workspace creation
-- **Display/Orchestration (lines 412-457)**: Main UI with two-tab layout
+- **Authentication** (`get_terraform_token`, `get_credentials_file_path`): Three-tier token discovery (env vars → credentials file → legacy)
+- **Module Discovery** (`get_link_list`, `_get_link_list_cached`): Fetch and filter no-code modules from HCP Terraform
+- **Settings/Persistence** (`settings`): Sidebar configuration with query param persistence
+- **Deployment Workflow** (`no_code_deploy`, `deploy_nocode_module`): Dynamic form generation and workspace creation
+- **Display/Orchestration** (`display`): Main UI with two-tab layout
 
 ## Code Style Guidelines
 
 ### Import Organization
-Order: Standard library (sorted) → Third-party → Local modules → Type hints
+Order: Standard library → Third-party → Local modules, each group sorted (enforced by ruff's isort rules;
+`make lint-fix` reorders)
 ```python
 # Standard library (alphabetical)
 import json
@@ -104,6 +101,7 @@ import logging
 import os
 import platform
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 # Third-party packages
@@ -112,9 +110,6 @@ from terrasnek.api import TFC
 
 # Local modules
 from no_code import NoCodeDeploy
-
-# Type hints (typing imports at end)
-from typing import Any, Tuple, Optional
 ```
 
 **Rules**:
@@ -143,7 +138,7 @@ f"Workspace {ws_name} deployed [here]({api.get_url()}{path})"
 - **Blank lines**: 2 between top-level functions, 1 within functions for logical separation
 
 #### Quotes
-- **Strings**: Single quotes `'string'` preferred, but double quotes `"string"` acceptable
+- **Strings**: Double quotes `"string"` (enforced by `ruff format`)
 - **Docstrings**: Always triple double quotes `"""`
 
 ### Type Hints
@@ -157,22 +152,22 @@ f"Workspace {ws_name} deployed [here]({api.get_url()}{path})"
 # ✅ Full type hints for utilities
 def get_credentials_file_path() -> Path:
 def extract_hostname(url: str) -> str:
-def get_terraform_token(url: str = "https://app.terraform.io") -> Tuple[Optional[str], str]:
+def get_terraform_token(url: str = "https://app.terraform.io") -> tuple[str | None, str]:
 
 # ✅ Partial type hints acceptable for complex functions
 def show_with_options(api: TFC, module_id: str):  # No return type needed
 def deploy_nocode_module(project):                # Complex Streamlit state
 
 # ✅ Type-annotated variables when helpful
-api: TFC = st.session_state['api']
+api: TFC = st.session_state["api"]
 deploy_result: Any
 ```
 
-**Type hint usage**:
-- `Optional[X]` for nullable values
-- `Tuple[X, Y]` for multi-value returns
+**Type hint usage** (built-in generics, as enforced by ruff's pyupgrade rules):
+- `X | None` for nullable values
+- `tuple[X, Y]`, `list[X]`, `dict[K, V]` for collections
 - `Any` for complex/unknown types (use sparingly)
-- No need for mypy/type checker enforcement
+- mypy runs in CI and `make verify`; code must pass `make type-check`
 
 ### Naming Conventions
 
@@ -202,17 +197,17 @@ class NoCodeDeploy:             # PascalCase
 **Style**: Google-style docstrings for public functions
 
 ```python
-def get_terraform_token(url: str = "https://app.terraform.io") -> Tuple[Optional[str], str]:
+def get_terraform_token(url: str = "https://app.terraform.io") -> tuple[str | None, str]:
     """Get Terraform token from multiple sources with priority.
-    
+
     Priority order:
     1. Environment variable TF_TOKEN_{hostname}
     2. ~/.terraform.d/credentials.tfrc.json file
     3. TFC_TOKEN environment variable (legacy)
-    
+
     Args:
         url: Terraform Cloud/Enterprise URL
-        
+
     Returns:
         Tuple of (token, source_description)
     """
