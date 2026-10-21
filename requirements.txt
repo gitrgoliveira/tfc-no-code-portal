@@ -12,8 +12,10 @@ blinker==1.9.0
     # via streamlit
 boolean-py==5.0
     # via license-expression
-cachecontrol==0.14.4
-    # via pip-audit
+cachecontrol[filecache]==0.14.4
+    # via
+    #   cachecontrol
+    #   pip-audit
 cachetools==6.2.6
     # via streamlit
 certifi==2026.1.4
@@ -24,11 +26,7 @@ charset-normalizer==3.4.4
     # via requests
 click==8.5.0
     # via streamlit
-colorama==0.4.6 ; sys_platform == 'win32'
-    # via
-    #   bandit
-    #   pytest
-coverage==7.13.3
+coverage[toml]==7.13.3
     # via pytest-cov
 cyclonedx-python-lib==11.12.0
     # via pip-audit
@@ -36,9 +34,10 @@ defusedxml==0.7.1
     # via py-serializable
 distlib==0.4.0
     # via virtualenv
-filelock==3.20.3
+filelock==3.32.7
     # via
     #   cachecontrol
+    #   python-discovery
     #   virtualenv
 gitdb==4.0.12
     # via gitpython
@@ -58,7 +57,7 @@ jsonschema==4.26.0
     # via altair
 jsonschema-specifications==2025.9.1
     # via jsonschema
-librt==0.7.8 ; platform_python_implementation != 'PyPy'
+librt==0.7.8
     # via mypy
 license-expression==30.4.4
     # via cyclonedx-python-lib
@@ -139,6 +138,8 @@ pytest-mock==3.15.1
     # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via pandas
+python-discovery==1.6.1
+    # via virtualenv
 pytz==2025.2
     # via pandas
 pyyaml==6.0.3
@@ -182,9 +183,7 @@ terrasnek==0.1.14
 toml==0.10.2
     # via streamlit
 tomli==2.4.1
-    # via
-    #   coverage
-    #   pip-audit
+    # via pip-audit
 tomli-w==1.2.0
     # via pip-audit
 tornado==6.5.10
@@ -202,10 +201,7 @@ urllib3==2.8.0
     # via requests
 uv==0.12.18
     # via -r requirements.in
-virtualenv==20.36.1
+virtualenv==21.7.13
     # via pre-commit
-watchdog==6.0.0 ; sys_platform != 'darwin'
+watchdog==6.0.0
     # via streamlit
-
-# The following packages were excluded from the output:
-# pip
