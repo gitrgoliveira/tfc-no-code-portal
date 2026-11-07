@@ -34,14 +34,14 @@ defusedxml==0.7.1
     # via py-serializable
 distlib==0.4.4
     # via virtualenv
-filelock==3.32.7
+filelock==4.2.1
     # via
     #   cachecontrol
     #   python-discovery
     #   virtualenv
 gitdb==4.0.12
     # via gitpython
-gitpython==3.1.62
+gitpython==3.2.1
     # via streamlit
 identify==2.6.16
     # via pre-commit
