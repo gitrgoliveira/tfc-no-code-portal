@@ -3,7 +3,7 @@
 ## Project Overview
 Production-ready Streamlit web application for deploying HCP Terraform no-code modules. Wraps the Terraform Cloud API (`terrasnek`) to enable infrastructure deployment through an intuitive UI without direct HCP Terraform interaction.
 
-**Stack**: Python 3.11-3.14, Streamlit 1.54.0, terrasnek 0.1.14, pytest, ruff, mypy
+**Stack**: Python 3.11-3.14, Streamlit 1.67.0, terrasnek 0.1.14, pytest, ruff, mypy
 
 ## Architecture (Modular Design - 6 Core Modules)
 
